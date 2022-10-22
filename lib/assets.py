@@ -71,8 +71,8 @@ VPNFileExt = ".ovpn"
 def startupscript_generate():
     #Startup Script Setup
     while True:
-        VPNFileName = input("What Is The OpenVPN FileName? (excluding extension)")
-        if VPNFileName:
+        VPNFileName = input("What Is The OpenVPN FileName? (excluding extension). If we don't want to use a VPN, just press 'enter'.")
+        if VPNFileName != "":
             if VPNFileExt in VPNFileName:
                 if re.match(ovpn_regex, VPNFileName):
                     break
@@ -81,14 +81,29 @@ def startupscript_generate():
                 break
             else:
                 print("Invalid Characters Entered.")
+        else:
+            print("No VPN supplied. Skipping.")
+            break
+        
+    print("Creating startup script")
+            
     EmmettStartupScript = open('build/Emmett/shared/startup.sh', 'w')
     EmmettStartupScript.write("""#!/bin/bash
-rm /etc/privoxy/config
+    echo "test";
+    """)
+
+    if VPNFileName != "":
+        print("Adding VPN to startup")
+        EmmettStartupScript.write("""rm /etc/privoxy/config
 cp /root/shared/config /etc/privoxy/config
 privoxy --pidfile /var/run/privoxy.pid /etc/privoxy/config
 cp /root/shared/motd /etc/motd
 echo 'cat /root/shared/motd' >> /root/.bashrc
-cd /root/shared/OpenVPN && openvpn """+VPNFileName)
+cd /root/shared/OpenVPN && openvpn +VPNFileName
+""")
+    else:
+        EmmettStartupScript.write("""tail -f /dev/null""")
+
     EmmettStartupScript.close()
 
     DeLoreanStartupScript = open('build/DeLoreans/shared/startup.sh', 'w')
@@ -96,7 +111,9 @@ cd /root/shared/OpenVPN && openvpn """+VPNFileName)
 echo 'cat /root/shared/motd' >> /root/.bashrc
 tail -f /dev/null""")
     DeLoreanStartupScript.close()
-    print("Ensure You Copy OpenVPN Connection Files To build/Emmett/shared/OpenVPN/")
+    
+    if VPNFileName != "":
+        print("Ensure You Copy OpenVPN Connection Files To build/Emmett/shared/OpenVPN/")
 
 #Uninstall
 def uninstall():
