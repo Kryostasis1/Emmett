@@ -2,45 +2,103 @@
     \_   _____/ _____   _____   _____/  |__/  |_ 
      |    __)_ /     \ /     \_/ __ \   __\   __\
      |        \  Y Y  \  Y Y  \  ___/|  |  |  |  
-    /_______  /__|_|  /__|_|  /\___  >__|  |__| 
-            \/      \/      \/     \/            
+    /_______  /__|_|  /__|_|  /\___  >__|  |__|  
+            \/      \/      \/     \/            v2.0.1
+A Docker based engagement tool. Emmett makes managing engagements easy, ensuring you are using a fresh Kali box for each engagement. Keeping your testing machine clean from previous client data while minimising the storage and resource usage that comes with the standard VM testing route.
 
-A python based engagement tool utilising docker containers
-
-=====Prequisites=====
-Emmett current only works on Windows.
+# Prerequisites
 
 Ensure the following is installed:
-Python 3.5+
-Pip
-Docker
+ - Python 3.5+
+ - Pip
+ - Docker
 
-=====Docker Setup=====
+# Install
 
-Once installed ensure that your user is within the Docker user group. To do this in an elevated CMD prompt use "net localgroup docker-users "your-user-id" /ADD
+## Linux 
 
-To remove the folder share prompt for each new engagement within the Docker Desktop settings go Resources>File Sharing>"full path to Clients folder" and add. The Clients folder will be automatically created by Emmett in the same parent folder as the Emmett directory.
+1. Install latest version of Docker https://docs.docker.com/engine/install/ubuntu/
 
-=====Initial Installation=====
+2. Complete post-installation step to manage docker as a non-root user https://docs.docker.com/engine/install/linux-postinstall/
 
-pip install -r requirements.txt
+3. `pip install -r requirements.txt`
 
-python setup.py (this process can take 30mins-1 hour due to the image creation process)
+4. `python3 emmett.py --setup` (this process can take 30 mins - 1 hour due to the image creation process)
 
-Copy your OpenVPN files to the directory .\build\ecscproxy\OpenVPN
+6. Copy your OpenVPN files to the directory ./build/proxy/OpenVPN
 
-=====Usage=====
+## Windows Installation
 
-Simply execute Run.bat through CMD, double click the file or create a shortcut to it.
+1. Install latest version of Docker Desktop https://www.docker.com/products/docker-desktop/
 
-During the engagement creation portion of Emmett you maybe prompted by Windows to allow sharing of the new folder, ensure to click to allow the share each time (see above Docker setup to remove this).
+2. Once installed ensure that your user is within the Docker user group. To do this, open an elevated CMD and use `net localgroup docker-users "your-user-id" /ADD`
 
-SSH connection binds to port 8008 allowing SOCKS proxy traffic to be tunnelled. To setup Burpsuite to use this install Burpsuite on the Windows host do the following:
+3. `pip install -r requirements.txt`
 
-User Options > Connections > SOCKS Proxy
-Use SOCKS Proxy Enabled
-SOCKS proxy host: 127.0.0.1
-SOCKS proxy port: 8008
+4. `python emmett.py --setup`
 
-To access ECSC VPN resources install FoxyProxy on a browser and create a proxy using the above info using SOCKS v5.
+6. Copy your OpenVPN files to the directory .\build\proxy\OpenVPN
 
+# Usage
+
+python emmett.py
+
+During the engagement creation portion of Emmett you maybe prompted in Windows to allow sharing of the new folder, to disable this add the Clients folder to File Sharing in Docker Desktop.
+
+## Emmett CLI Command List
+```connect - Open a bash session on container.
+  Usage: connect [container]
+
+exit - Kill all Emmett jobs and exit.
+help - Show this screen.
+kill - Kill containers
+  Usage:  kill [container] - Kill selected Emmett container.
+    kill all - Kill all Emmett containers.
+
+new - Start new Emmett container.
+  Usage:  new [container]
+  CONTAINER TYPES:
+    Emmett - VPN proxy container (this is unique, only 1 can run at a time).
+    Kali - Starts new persistent Kali container.
+
+run - Execute a tool against scope file. Outputs will be given in the engagements output folder.
+  Usage: run [tool]
+  TOOL LIST:
+    engagement - Runs all tools.
+    nmap
+    testssl	
+
+scope - Interact with engagement scope file.
+  Usage: scope [options]
+  OPTIONS:
+  show - Output engagement scope file.
+  create - Create engagement scope file.
+  add - Add to engagement scope file.
+
+status - Show current terminal output of chosen container.
+  Usage: status [container]
+tail - Show continous terminal output of chosen container.
+  Usage: tail [container]
+```	
+
+
+# Tips & Info
+
+Privoxy is running over port 8118. In order to use Burpsuite with this you must install Burpsuite on your base (or whatever you're going to be running Emmett from) and do the following in Burp:
+
+User Options > Connections > Upstream Proxy Servers\
+Add\
+Proxy host: 127.0.0.1\
+Proxy port: 8008\
+
+To access VPN resources install FoxyProxy on a browser and create a proxy using the above info using SOCKS v5.
+
+# Troubleshooting
+
+Check the below to see if any of these can help. If not, throw me a message and i'll be happy to assist.
+
+Setup phase hanging on container creation? This process can take a long time and depends on both your internet connection speed and PC setup due to it downloading roughly 8gb of apps to build the container images. That said if it has been running over an hour try hitting the enter key as the terminal output can sometimes hang.
+
+# Uninstall
+
+`python emmett.py --uninstall`
