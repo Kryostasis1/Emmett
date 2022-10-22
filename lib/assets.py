@@ -24,11 +24,19 @@ regex = '^[a-zA-Z0-9\ \-\_\!\"\£\$\=\+]+$'
 ovpn_regex = '^[a-zA-Z0-9\ \-\_\!\"\£\$\=\+\.]+$'
 scope_regex = '^[a-zA-Z0-9\ \-\_\!\"\£\$\=\+\.\/\:]+$'
 
-#Docker Functions
+######################################################
+# Pentesting Image Getter
+######################################################
+
 def kali_pull():
         #Pull Kali Image
         print("Pulling Latest Kali Image")
         client.images.pull(repository="kalilinux/kali-rolling:latest")
+
+
+######################################################
+# Image Management
+######################################################
 
 def image_create():
          #Creating Emmett Image
@@ -66,56 +74,85 @@ def image_update():
     except:
         print("Error Updating.")
 
-#Startup Script Functions
-VPNFileExt = ".ovpn"
-def startupscript_generate():
-    #Startup Script Setup
-    while True:
-        VPNFileName = input("What Is The OpenVPN FileName? (excluding extension). If we don't want to use a VPN, just press 'enter'.")
-        if VPNFileName != "":
-            if VPNFileExt in VPNFileName:
-                if re.match(ovpn_regex, VPNFileName):
-                    break
-            if re.match(ovpn_regex, VPNFileName): #Checking user input for bad characters
-                VPNFileName = VPNFileName+VPNFileExt
-                break
-            else:
-                print("Invalid Characters Entered.")
-        else:
-            print("No VPN supplied. Skipping.")
-            break
-        
-    print("Creating startup script")
-            
-    EmmettStartupScript = open('build/Emmett/shared/startup.sh', 'w')
-    EmmettStartupScript.write("""#!/bin/bash
-    echo "test";
-    """)
 
-    if VPNFileName != "":
+
+
+######################################################
+# Startup Script Functions
+######################################################
+
+def start_up_script_dialogue():
+    user_wants_vpn = input("Do you want to include a VPN as part of your start up (y/N)?")
+    if user_wants_vpn == "" or user_wants_vpn.strip().upper() == "N":
+        user_wants_vpn = False
+    else:
+        # anything else == yes
+        user_wants_vpn = True
+    
+
+    # we only implement OpenVPN for now
+    VPNFileExt = ".ovpn"
+    VPNFileName = ""
+
+    if user_wants_vpn:
+        while True:
+            VPNFileName = input("What Is The OpenVPN FileName? (excluding extension)")
+            if VPNFileName != "":
+                if VPNFileExt in VPNFileName:
+                    if re.match(ovpn_regex, VPNFileName):
+                        break
+
+                if re.match(ovpn_regex, VPNFileName): #Checking user input for bad characters
+                    VPNFileName = VPNFileName+VPNFileExt
+                    break
+                else:
+                    print("Invalid Characters Entered.")
+    
+    return (user_wants_vpn, VPNFileName)
+
+
+def startupscript_generate():
+    print("Creating startup script")
+    user_wants_vpn, vpn_file_name  = start_up_script_dialogue()
+
+    EmmettStartupScript = open('build/Emmett/shared/startup.sh', 'w')
+
+    if user_wants_vpn:
         print("Adding VPN to startup")
-        EmmettStartupScript.write("""rm /etc/privoxy/config
+        EmmettStartupScript.write("""#!/bin/bash
+rm /etc/privoxy/config
 cp /root/shared/config /etc/privoxy/config
 privoxy --pidfile /var/run/privoxy.pid /etc/privoxy/config
 cp /root/shared/motd /etc/motd
 echo 'cat /root/shared/motd' >> /root/.bashrc
-cd /root/shared/OpenVPN && openvpn +VPNFileName
-""")
+cd /root/shared/OpenVPN && openvpn"""+VPNFileName
+        )
+        
+        print("Ensure You Copy OpenVPN Connection Files To build/Emmett/shared/OpenVPN/")
     else:
-        EmmettStartupScript.write("""tail -f /dev/null""")
+        # No VPN, we just want MOTD and to run forever
+        EmmettStartupScript.write("""#!/bin/bash
+cp /root/shared/motd /etc/motd
+echo 'cat /root/shared/motd' >> /root/.bashrc
+tail -f /dev/null
+        """)
 
     EmmettStartupScript.close()
 
+    # DeLorean scripts are pretty generic and will just run forever
     DeLoreanStartupScript = open('build/DeLoreans/shared/startup.sh', 'w')
     DeLoreanStartupScript.write("""#!/bin/bash
 echo 'cat /root/shared/motd' >> /root/.bashrc
 tail -f /dev/null""")
     DeLoreanStartupScript.close()
-    
-    if VPNFileName != "":
-        print("Ensure You Copy OpenVPN Connection Files To build/Emmett/shared/OpenVPN/")
 
-#Uninstall
+    print("Finished creating start up scripts")
+
+
+######################################################
+# Uninstall Function
+######################################################
+
 def uninstall():
     username = getlogin()
     while True:
