@@ -4,13 +4,17 @@ import re
 import subprocess
 import os
 import argparse
-from lib import assets
 from datetime import date
 from pathlib import Path
 from prompt_toolkit import print_formatted_text, HTML, PromptSession, Application
 from prompt_toolkit.completion import NestedCompleter
 from prompt_toolkit.history import InMemoryHistory
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+
+## OUR LIBRARY
+from lib import assets
+from lib import modules
+
 client = docker.from_env()
 today = date.today()
 
@@ -253,6 +257,10 @@ def main():
 					except:
 						print("Unable to Connect to "+MasterInput[1])
 
+
+			### MODULE USAGE WILL BE HERE, 
+			### NOTE: STARTING TO SLOWLY REFACTOR SO WILL LOOK MESSY FOR A BIT
+
 			if MasterInput[0] == "run": #Run a tool
 				if len(MasterInput) == 1:
 					print("""COMMAND HELP:
@@ -264,7 +272,8 @@ def main():
     testssl	
 						""")
 				else:
-					if re.search('engagement', MasterInput[1], re.IGNORECASE):
+					run_command_input = MasterInput[1]
+					if re.search('engagement', run_command_input, re.IGNORECASE):
 						NmapCounter = NmapCounter+1
 						NewNmapName = 'Nmap%s' % NmapCounter
 						globals()['NmapContainer%s' % NmapCounter] = client.containers.run("delorean", "nmap -sV -p- -iL /root/Documents/hosts -v -oN /root/Documents/output/nmap/tcp_output", detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewNmapName, labels=["Emmett"], volumes=[DocumentsVolume])
@@ -272,17 +281,35 @@ def main():
 						NewSSLName = 'Testssl%s' % SSLCounter
 						SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls && testssl --warnings=batch --html --json --file ../../hosts && /root/shared/EzModeSSL -d . -o "+ClientName+"\""
 						globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
-					
-					if re.search('nmap', MasterInput[1], re.IGNORECASE):
-						NmapCounter = NmapCounter+1
-						NewNmapName = 'Nmap%s' % NmapCounter
-						globals()['NmapContainer%s' % NmapCounter] = client.containers.run("delorean", "nmap -sV -p- -iL /root/Documents/hosts -v -oN /root/Documents/output/nmap/tcp_output", detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewNmapName, labels=["Emmett"], volumes=[DocumentsVolume])
-					
-					if re.search('testssl', MasterInput[1], re.IGNORECASE):
-						SSLCounter = SSLCounter+1
-						NewSSLName = 'Testssl%s' % SSLCounter
-						SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls && testssl --warnings=batch --html --json --file ../../hosts && /root/shared/EzModeSSL -d . -o "+ClientName+"\""
-						globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+					else:
+						### SWITCHING TO MODULE BASED SO REMOVED HARDCODED STATEMENTS
+						if modules.is_module(run_command_input):
+							optional_args = modules.OPTIONAL_ARGS.copy()
+							optional_args["<--CLIENT_NAME-->"] = "Test"
+
+							## TODO: we want to pass in an object here that has all our information for find/replace in commands that need it
+							# perhaps a class object that is populate once per client target? Includes some base data?
+							module_command = modules.get_module_cmd(run_command_input, optional_args)
+							globals()['NmapContainer%s' % NmapCounter] = client.containers.run(
+								"delorean", 
+								module_command,
+								detach=True, 
+								remove=True, 
+								network_mode="container:Emmett", 
+								privileged=False, 
+								name=run_command_input + str(modules.get_module_info(run_command_input, "runCount")), 
+								labels=["Emmett"], 
+								volumes=[DocumentsVolume, DeLoreansBuildVolume]
+							)
+							modules.run_module_requested(run_command_input)
+						else:
+							print("Sorry, not a recognised module")
+
+						#if re.search('testssl', MasterInput[1], re.IGNORECASE):
+						#	SSLCounter = SSLCounter+1
+						#	NewSSLName = 'Testssl%s' % SSLCounter
+						#	SSLCommand = 
+						#	globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 
 			if MasterInput[0] == "scope": #Actions relating to the scope
 				if len(MasterInput) == 1:
