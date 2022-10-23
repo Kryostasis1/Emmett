@@ -263,14 +263,18 @@ def main():
 
 			if MasterInput[0] == "run": #Run a tool
 				if len(MasterInput) == 1:
-					print("""COMMAND HELP:
+					help_text_to_print = """COMMAND HELP:
   Description - Execute a tool against scope file. Outputs will be given in the engagements output folder.
   Usage: run [tool]
-  TOOL LIST:
+  Commands:
     engagement - Runs all tools.
-    nmap
-    testssl	
-						""")
+
+  Modules:\n"""
+					all_module_data = modules.get_all_module_info()
+					for m in all_module_data:
+						help_text_to_print += "\t" + m + " - " + all_module_data[m]["description"] + "\n"
+
+					print(help_text_to_print)
 				else:
 					run_command_input = MasterInput[1]
 					if re.search('engagement', run_command_input, re.IGNORECASE):
@@ -304,12 +308,6 @@ def main():
 							modules.run_module_requested(run_command_input)
 						else:
 							print("Sorry, not a recognised module")
-
-						#if re.search('testssl', MasterInput[1], re.IGNORECASE):
-						#	SSLCounter = SSLCounter+1
-						#	NewSSLName = 'Testssl%s' % SSLCounter
-						#	SSLCommand = 
-						#	globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 
 			if MasterInput[0] == "scope": #Actions relating to the scope
 				if len(MasterInput) == 1:
