@@ -39,6 +39,17 @@ Ensure the following is installed:
 
 6. Copy your OpenVPN files to the directory .\build\proxy\OpenVPN
 
+# OSX  
+  
+Similar install to linux above, but for Docker, ensure you install and 
+run to fix the missing socket/daemon issue acknowledged here 
+(https://github.com/docker/for-mac/issues/6531): 
+
+```sudo ln -s "$HOME/.docker/run/docker.sock" /var/run/docker.sock```  
+  
+Note: This was tested only on an M2 macbook, not sure if this will apply 
+for other models.
+
 # Usage
 
 python emmett.py
