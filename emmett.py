@@ -14,6 +14,7 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 ## OUR LIBRARY
 from lib import assets
 from lib import modules
+from lib import commands
 
 client = docker.from_env()
 today = date.today()
@@ -184,7 +185,7 @@ def main():
   run - Execute a tool against scope file. Outputs will be given in the engagements output folder.
 	Usage: run [tool]
 	TOOL LIST:
-	  engagement - Runs all tools.
+	  external - Performs a basic external test.
 	  nmap
 	  testssl	
 
@@ -267,7 +268,7 @@ def main():
   Description - Execute a tool against scope file. Outputs will be given in the engagements output folder.
   Usage: run [tool]
   Commands:
-    engagement - Runs all tools.
+    external - Performs a basic external test.
 
   Modules:\n"""
 					all_module_data = modules.get_all_module_info()
@@ -277,24 +278,46 @@ def main():
 					print(help_text_to_print)
 				else:
 					run_command_input = MasterInput[1]
-					if re.search('engagement', run_command_input, re.IGNORECASE):
-						NmapCounter = NmapCounter+1
-						NewNmapName = 'Nmap%s' % NmapCounter
-						globals()['NmapContainer%s' % NmapCounter] = client.containers.run("delorean", "nmap -sV -p- -iL /root/Documents/hosts -v -oN /root/Documents/output/nmap/tcp_output", detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewNmapName, labels=["Emmett"], volumes=[DocumentsVolume])
-						SSLCounter = SSLCounter+1
-						NewSSLName = 'Testssl%s' % SSLCounter
-						SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls && testssl --warnings=batch --html --json --file ../../hosts && /root/shared/EzModeSSL -d . -o "+ClientName+"\""
-						globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+
+					# TODO: change this up so we send a unique for cmd or module
+					if re.search('external', run_command_input, re.IGNORECASE):
+						optional_args = modules.OPTIONAL_ARGS.copy()
+						optional_args["<--CLIENT_NAME-->"] = "Test"
+
+						if commands.is_command(run_command_input):
+							target_command_modules = commands.get_command_modules(run_command_input)
+
+							for m in target_command_modules:
+								module_command = modules.get_module_cmd(m, optional_args)
+								current_module_run_count = str(modules.get_module_info(m, "runCount"))
+
+								globals()['%s_%s' % (m, current_module_run_count)] = client.containers.run(
+									"delorean", 
+									module_command,
+									detach=True, 
+									remove=True, 
+									network_mode="container:Emmett", 
+									privileged=False, 
+									name=m + "_" + current_module_run_count, 
+									labels=["Emmett"], 
+									volumes=[DocumentsVolume, DeLoreansBuildVolume]
+								)
+								modules.run_module_requested(m)
+
+						else:
+							print("Sorry, not a recognised command")
 					else:
 						### SWITCHING TO MODULE BASED SO REMOVED HARDCODED STATEMENTS
 						if modules.is_module(run_command_input):
 							optional_args = modules.OPTIONAL_ARGS.copy()
 							optional_args["<--CLIENT_NAME-->"] = "Test"
 
+							current_module_run_count = modules.get_module_info(run_command_input, "runCount")
+
 							## TODO: we want to pass in an object here that has all our information for find/replace in commands that need it
 							# perhaps a class object that is populate once per client target? Includes some base data?
 							module_command = modules.get_module_cmd(run_command_input, optional_args)
-							globals()['NmapContainer%s' % NmapCounter] = client.containers.run(
+							globals()['%s_%s' % (run_command_input, current_module_run_count)] = client.containers.run(
 								"delorean", 
 								module_command,
 								detach=True, 
@@ -333,8 +356,8 @@ Enter/Paste Your Testing Scope. Ctrl-Z (Windows) or Ctrl-D (Linux) on a New Line
 						while True:
 						    try:
 						        line = input()
-						        if line:
-						        	if re.match(assets.scope_regex, line): #Checking user input for bad characters
+								if line:
+									if re.match(assets.scope_regex, line): #Checking user input for bad characters
 						        		EngagementScope.append(line)
 						        	else:
 						        		print("The Previous Line Contained Inavlid Characters And Will Be Omitted From The Scope File. Please Add Manually Afterwards If Required.")

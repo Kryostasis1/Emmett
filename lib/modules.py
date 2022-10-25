@@ -1,5 +1,6 @@
 ### The modules used my Emmett to run scans on the Kali box
 
+# TODO: switch this to a collection of json files and load from dir
 modules = {
     "nmap" : {
         "cmd" : "nmap -sV -p- -iL /root/Documents/hosts -v -oN /root/Documents/output/nmap/tcp_output",
