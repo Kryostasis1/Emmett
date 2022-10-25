@@ -19,6 +19,8 @@ from lib import commands
 client = docker.from_env()
 today = date.today()
 
+#### TODO: Create a cli script that brings in the states and the state options so it's easier to handle!
+
 #Header
 usage_text = 'python emmett.py'
 example_text = '''Example:
