@@ -1,3 +1,5 @@
 docker
-cryptography
 prompt_toolkit
+termcolor
+bs4
+lxml

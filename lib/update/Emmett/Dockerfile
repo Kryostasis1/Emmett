@@ -1,2 +1,3 @@
 FROM emmett:latest
-RUN apt update
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt -y update && apt -y upgrade

@@ -7,7 +7,6 @@ from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.styles import Style
 from prompt_toolkit.output.color_depth import ColorDepth
 import docker
-import assets
 client = docker.from_env()
 
 style = Style([
@@ -18,7 +17,8 @@ style = Style([
 
 def get_titlebar(): #Top title area, including Active container list
     titlebar = [
-            ("class:title", assets.logo),
+            ("fg:green", assets.app_logo),
+            ("class:title", assets.app_slogan),
             ("class:title", " (Press [Ctrl-Q] to quit.)\n"),
         ]
     return titlebar
