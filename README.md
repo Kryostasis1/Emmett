@@ -3,7 +3,7 @@
      |    __)_ /     \ /     \_/ __ \   __\   __\
      |        \  Y Y  \  Y Y  \  ___/|  |  |  |  
     /_______  /__|_|  /__|_|  /\___  >__|  |__|  
-            \/      \/      \/     \/            v2.1.8
+            \/      \/      \/     \/            v2.1.9
 A Docker based engagement tool. Emmett makes managing engagements easy, ensuring you are using a fresh Kali box for each engagement. Keeping your testing machine clean from previous client data while minimising the storage and resource usage that comes with the standard VM testing route.
 
 # Prerequisites
