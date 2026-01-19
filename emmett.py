@@ -774,9 +774,9 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 					if re.search('testssl', MasterInput[1], re.IGNORECASE):
 						SSLCounter = SSLCounter+1
 						NewSSLName = 'Testssl%s' % SSLCounter
-						SSLHTMLFileName = "tls_output_"+now.strftime("%d%m%y_%H%M")+".html"
+						SSLHTMLFileName = "tls_output_"+now.strftime("%d%m%y_%H%M")+".txt"
 						if TLSHostFileCheck.is_file():
-							SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls/raw_outputs && testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt |& tee -a /tmp/"+SSLHTMLFileName+" && cat /tmp/"+SSLHTMLFileName+" | ansi2html > /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+ClientName+"\""
+							SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls/raw_outputs && script -q -c 'testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt' /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+ClientName+"\""
 							globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nTestSSL command \"{}\" has been executed in container ".format(colored("testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt", "yellow"))+"{}".format(colored(NewSSLName, "yellow"))+". When complete outputs can be found within {}.".format(colored("output/tls/", "yellow")))						
 						else:

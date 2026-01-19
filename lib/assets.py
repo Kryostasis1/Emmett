@@ -21,7 +21,7 @@ ___________                       __    __
 /_______  /__|_|  /__|_|  /\\___  >__|  |__| 
         \\/      \\/      \\/     \\/            """)
 
-slogan = ("""v2.1.10
+slogan = ("""v2.1.11
 The Way I See It, If You're Gonna Build An Engagement, Why Not Do It With Some Style?
 
 
@@ -34,7 +34,7 @@ ___________                       __    __
  |    __)_ /     \\ /     \\_/ __ \\   __\\   __\\
  |        \\  Y Y  \\  Y Y  \\  ___/|  |  |  |  
 /_______  /__|_|  /__|_|  /\\___  >__|  |__| 
-              \\/      \\/      \\/     \\/            v2.1.10
+              \\/      \\/      \\/     \\/            v2.1.11
     """)
 
 app_slogan = ("""The Way I See It, If You're Gonna Build An Engagement, Why Not Do It With Some Style?
