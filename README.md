@@ -3,7 +3,7 @@
      |    __)_ /     \ /     \_/ __ \   __\   __\
      |        \  Y Y  \  Y Y  \  ___/|  |  |  |  
     /_______  /__|_|  /__|_|  /\___  >__|  |__|  
-            \/      \/      \/     \/            v2.1.12
+            \/      \/      \/     \/            v2.1.13
 A Docker based engagement tool. Emmett makes managing engagements easy, ensuring you are using a fresh Kali box for each engagement. Keeping your testing machine clean from previous client data while minimising the storage and resource usage that comes with the standard VM testing route.
 
 # Prerequisites
@@ -25,7 +25,7 @@ Ensure the following is installed:
 
 4. `python3 emmett.py --setup` (this process can take 30 mins - 1 hour due to the image creation process)
 
-6. Copy your OpenVPN files to the directory ./build/Emmett/shared/OpenVPN/
+5. (Optional) Copy your OpenVPN files to the directory ./build/Emmett/shared/OpenVPN/ 
 
 ## Windows Installation
 
@@ -37,7 +37,7 @@ Ensure the following is installed:
 
 4. `python run.py`
 
-5. Copy your OpenVPN files to the directory .\build\Emmett\shared\OpenVPN\
+5. (Optional) Copy your OpenVPN files to the directory .\build\Emmett\shared\OpenVPN\
 
 # Usage
 
@@ -127,11 +127,9 @@ To access VPN resources install FoxyProxy on a browser and create a proxy using 
 
 # Troubleshooting
 
-Check the below to see if any of these can help. If not, throw me a message and i'll be happy to assist.
-
 Setup phase hanging on container creation? This process can take a long time and depends on both your internet connection speed and PC setup due to it downloading roughly 8gb of apps to build the container images. That said if it has been running over an hour try hitting the enter key as the terminal output can sometimes hang.
 
-Emmett container failing to run? Check that your VPN file is configured correctly (or ovpn files may need adjusting to allow deprecated ciphers to work on new version of openvpn.)
+Emmett container failing to run? Check that your VPN file is configured correctly.
 
 # Uninstall
 

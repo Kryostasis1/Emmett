@@ -5,6 +5,8 @@ import subprocess
 import os
 import argparse
 import time
+import getpass
+from docker.types import Mount
 from lib import assets
 from termcolor import colored
 from configparser import ConfigParser
@@ -84,15 +86,31 @@ def main(ClientName, DirectoryName):
 	config_object.set('GLOBAL', 'preveng', DirectoryName)
 	with open(GlobalConfigBuildName, 'w') as configfile:
 		config_object.write(configfile)
+		EmmettVPNMFACheck = config_object.get("VPN", "mfa")
+		EmmettVPNStatusCheck = config_object.get("VPN", "status")
 	curreng_object.read(ConfigFileName)
 	enginfo = curreng_object['ENGINFO']
 	AutoEng_Config = curreng_object['AUTOENG']
+	if EmmettVPNStatusCheck == "Enabled":
+		if EmmettVPNMFACheck == "True":
+			VPNPassword = getpass.getpass("VPN Password: ")
+			VPNmfa = input("MFA Code: ")
+			try:
+				EmmettContainer = client.containers.run("emmett", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume], environment={"VPN_PASSWORD": VPNPassword, "VPN_MFA": VPNmfa})
+			except docker.errors.APIError:
+				pass
+		else:
+			try:
+				EmmettContainer = client.containers.run("emmett", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume])
+			except docker.errors.APIError:
+				pass
+	else:
+			try:
+				EmmettContainer = client.containers.run("emmett", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/novpnstartup.sh"], devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume])
+			except docker.errors.APIError:
+				pass
 	try:
-		EmmettContainer = client.containers.run("emmett", detach=True, remove=True, devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume])
-	except docker.errors.APIError:
-		pass
-	try:
-		globals()['KaliContainer%s' % KaliCounter] = client.containers.run("delorean", detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=InitialKaliName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+		globals()['KaliContainer%s' % KaliCounter] = client.containers.run("delorean", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=InitialKaliName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 	except docker.errors.APIError:
 		pass
 
@@ -346,17 +364,23 @@ def main(ClientName, DirectoryName):
 								""")
 						else:
 							if re.search('emmett', MasterInput[2], re.IGNORECASE):
-								EmmettContainer = client.containers.run("emmett", detach=True, remove=True, devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume])
+								mfa_status = config_object.get('VPN', 'mfa')
+								vpn_status = config_object.get('VPN', 'status')
+								if vpn_status == 'Enabled':
+									vpn_status = 'y'
+								else:
+									vpn_status = 'n'
+								assets.emmett_startup(mfa_status, vpn_status)
 								print("Starting {} Container".format(colored("Emmett", "yellow")))
 							if MasterInput[2] == 'kali':
 								KaliCounter = KaliCounter+1
 								NewKaliName = 'Kali%s' % KaliCounter
-								globals()['KaliContainer%s' % KaliCounter] = client.containers.run("delorean", detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewKaliName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+								globals()['KaliContainer%s' % KaliCounter] = client.containers.run("delorean", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewKaliName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 								print("Starting Kali container named {}".format(colored(NewKaliName, "yellow")))
 							if re.search('kali-priv', MasterInput[2], re.IGNORECASE):
 								KaliCounter = KaliCounter+1
 								NewKaliName = 'Kali%s-priv' % KaliCounter
-								globals()['KaliContainer%s' % KaliCounter] = client.containers.run("delorean", detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=True, name=NewKaliName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+								globals()['KaliContainer%s' % KaliCounter] = client.containers.run("delorean", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=True, name=NewKaliName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 								print("Starting Privileged Kali container named {}".format(colored(NewKaliName, "yellow")))
 
 					if re.search('scope', MasterInput[1], re.IGNORECASE):
@@ -645,21 +669,20 @@ def main(ClientName, DirectoryName):
 										DirbHostNum = len(i)
 										DirbHostNum = str(DirbHostNum)
 										DirbCommand = "/bin/bash -c \"mv /root/Documents/data/"+DirbNewName+"_hosts.txt /tmp/ && python /root/shared/tools/dirbloop.py -f /tmp/"+DirbNewName+"_hosts.txt -o /root/Documents/output/http/"+DirbFileName+"\""
-										globals()['DirbContainer%s' % DirbCounter] = client.containers.run("delorean", DirbCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=DirbNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+										globals()['DirbContainer%s' % DirbCounter] = client.containers.run("delorean", DirbCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=DirbNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 										print("\nDirb has been executed in container for "+DirbHostNum+" hosts from the http scope file. When complete output can be found within {}.".format(colored("output/http/"+DirbFileName, "yellow")))
 								else:
-									print("working")
 									DirbCounter = DirbCounter+1
 									DirbNewName = 'Dirb%s' % DirbCounter
 									DirbFileName = "dirb_output_"+now.strftime("%d%m%y_%H%M")+".txt"
 									DirbCommand = "/bin/bash -c \"python /root/shared/tools/dirbloop.py -f /root/Documents/data/http_hosts.txt -o /root/Documents/output/http/"+DirbFileName+"\""
-									globals()['DirbContainer%s' % DirbCounter] = client.containers.run("delorean", DirbCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=DirbNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+									globals()['DirbContainer%s' % DirbCounter] = client.containers.run("delorean", DirbCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=DirbNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 									print("\nDirb has been executed in container for all hosts in http scope file. When complete output can be found within {}.".format(colored("output/http/"+DirbFileName, "yellow")))
 
 					if re.search('livehosts', MasterInput[1], re.IGNORECASE):
 						LivehostsCounter = LivehostsCounter+1
 						NewLivehostsName = 'Livehosts%s' % LivehostsCounter
-						globals()['LivehostsContainer%s' % LivehostsCounter] = client.containers.run("delorean", "/bin/sh -c \"nmap -p- --open -iL /root/Documents/data/hosts.txt -oG - | grep '/open' | awk '{ print $2 }' > /root/Documents/output/nmap/livehosts.txt\"", detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewLivehostsName, labels=["Emmett"], volumes=[DocumentsVolume])
+						globals()['LivehostsContainer%s' % LivehostsCounter] = client.containers.run("delorean", "/bin/sh -c \"nmap -p- --open -iL /root/Documents/data/hosts.txt -oG - | grep '/open' | awk '{ print $2 }' > /root/Documents/output/nmap/livehosts.txt\"", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewLivehostsName, labels=["Emmett"], volumes=[DocumentsVolume])
 						print("\nNmap command \"{}\" has been executed in container ".format(colored("nmap -p- --open -iL /root/Documents/data/hosts.txt", "yellow"))+"{}".format(colored(NewLivehostsName, "yellow"))+". When complete outputs can be found within {}.".format(colored("output/nmap/livehosts.txt", "yellow")))		
 
 					if re.search('nikto', MasterInput[1], re.IGNORECASE):
@@ -689,14 +712,14 @@ def main(ClientName, DirectoryName):
 										NiktoHostNum = len(i)
 										NiktoHostNum = str(NiktoHostNum)
 										NiktoCommand = "/bin/bash -c \"mv /root/Documents/data/"+NiktoNewName+"_hosts.txt /tmp/ && nikto -h /tmp/"+NiktoNewName+"_hosts.txt |& tee /root/Documents/output/http/"+NiktoFileName+"\""
-										globals()['NiktoContainer%s' % NiktoCounter] = client.containers.run("delorean", NiktoCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NiktoNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+										globals()['NiktoContainer%s' % NiktoCounter] = client.containers.run("delorean", NiktoCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NiktoNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 										print("\nNikto command \"{}\" has been executed for ".format(colored("nikto -h /root/Documents/data/http_hosts.txt", "yellow"))+NiktoHostNum+" hosts from the scope in container "+"{}".format(colored(NiktoNewName, "yellow"))+". When complete output can be found within {}.".format(colored("output/http/"+NiktoFileName, "yellow")))
 								else:
 									NiktoCounter = NiktoCounter+1
 									NiktoNewName = 'Nikto%s' % NiktoCounter
 									NiktoFileName = NiktoNewName+"_output_"+now.strftime("%d%m%y_%H%M")+".txt"
 									NiktoCommand = "/bin/bash -c \"nikto -h /root/Documents/data/http_hosts.txt >> /root/Documents/output/http/"+NiktoFileName+"\""
-									globals()['NiktoContainer%s' % NiktoCounter] = client.containers.run("delorean", NiktoCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NiktoNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+									globals()['NiktoContainer%s' % NiktoCounter] = client.containers.run("delorean", NiktoCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NiktoNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 									print("\nNikto command \"{}\" has been executed in container ".format(colored("nikto -h /root/Documents/data/http_hosts.txt", "yellow"))+"{}".format(colored(NiktoNewName, "yellow"))+". When complete output can be found within {}.".format(colored("output/http/"+NiktoFileName, "yellow")))
 	
 
@@ -719,7 +742,7 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 							TCPNewNmapName = 'Nmaptcp%s' % TCPNmapCounter
 							TCPNmapFileName = "tcp_output_"+now.strftime("%d%m%y_%H%M")
 							TCPNmapCommand = "/bin/bash -c \"nmap -sV -p- -iL /root/Documents/data/hosts.txt -v -oN /root/Documents/output/nmap/raw_outputs/tcp_raw.txt && python /root/shared/tools/parzival.py -f /root/Documents/output/nmap/raw_outputs/tcp_raw.txt -o /root/Documents/output/nmap/"+TCPNmapFileName+"\""
-							globals()['TCPNmapContainer%s' % TCPNmapCounter] = client.containers.run("delorean", TCPNmapCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=TCPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['TCPNmapContainer%s' % TCPNmapCounter] = client.containers.run("delorean", TCPNmapCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=TCPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nNmap command \"{}\" has been executed in container ".format(colored("nmap -sV -p- -iL /root/Documents/data/hosts.txt", "yellow"))+"{}".format(colored(TCPNewNmapName, "yellow"))+". When complete output can be found within {}.".format(colored("output/nmap/"+TCPNmapFileName+".txt", "yellow")))
 
 						if re.search('udp', MasterInput[2], re.IGNORECASE):
@@ -727,7 +750,7 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 							UDPNmapFileName = "udp_output_"+now.strftime("%d%m%y_%H%M")
 							UDPNewNmapName = 'Nmapudp%s' % UDPNmapCounter
 							UDPNmapCommand = "/bin/bash -c \"nmap -sU -iL /root/Documents/data/hosts.txt -v -oN /root/Documents/output/nmap/raw_outputs/udp_raw.txt && python /root/shared/tools/parzival.py -f /root/Documents/output/nmap/raw_outputs/udp_raw.txt -o /root/Documents/output/nmap/udp_output"+UDPNmapFileName+"\""
-							globals()['UDPNmapContainer%s' % UDPNmapCounter] = client.containers.run("delorean", UDPNmapCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=UDPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['UDPNmapContainer%s' % UDPNmapCounter] = client.containers.run("delorean", UDPNmapCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=UDPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nNmap command \"{}\" has been executed in container ".format(colored("nmap -sU -iL /root/Documents/data/hosts.txt", "yellow"))+"{}".format(colored(UDPNewNmapName, "yellow"))+". When complete output can be found within {}.".format(colored("output/nmap/"+UDPNmapFileName+".txt", "yellow")))
 
 					if re.search('nmap', MasterInput[1], re.IGNORECASE) and len(MasterInput) == 4:
@@ -736,7 +759,7 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 							TCPNewNmapName = 'Nmaptcp%s' % TCPNmapCounter
 							TCPNmapFileName = "tcp_output_"+now.strftime("%d%m%y_%H%M")
 							TCPNmapCommand = "/bin/bash -c \"nmap -sV -Pn -p- -iL /root/Documents/data/hosts.txt -v -oN /root/Documents/output/nmap/raw_outputs/tcp_raw.txt && python /root/shared/tools/parzival.py -f /root/Documents/output/nmap/raw_outputs/tcp_raw.txt -o /root/Documents/output/nmap/"+TCPNmapFileName+"\""
-							globals()['TCPNmapContainer%s' % TCPNmapCounter] = client.containers.run("delorean", TCPNmapCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=TCPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['TCPNmapContainer%s' % TCPNmapCounter] = client.containers.run("delorean", TCPNmapCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=TCPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nNmap command \"{}\" has been executed in container ".format(colored("nmap -sV -Pn -p- -iL /root/Documents/data/hosts.txt", "yellow"))+"{}".format(colored(TCPNewNmapName, "yellow"))+". When complete output can be found within {}.".format(colored("output/nmap/"+TCPNmapFileName+".txt", "yellow")))
 					
 					if re.search('nmap', MasterInput[1], re.IGNORECASE) and len(MasterInput) == 4:
@@ -745,7 +768,7 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 							UDPNmapFileName = "udp_output_"+now.strftime("%d%m%y_%H%M")
 							UDPNewNmapName = 'Nmapudp%s' % UDPNmapCounter
 							UDPNmapCommand = "/bin/bash -c \"nmap -sU -Pn -iL /root/Documents/data/hosts.txt -v -oN /root/Documents/output/nmap/raw_outputs/udp_raw.txt && python /root/shared/tools/parzival.py -f /root/Documents/output/nmap/raw_outputs/udp_raw.txt -o /root/Documents/output/nmap/udp_output"+UDPNmapFileName+"\""
-							globals()['UDPNmapContainer%s' % UDPNmapCounter] = client.containers.run("delorean", UDPNmapCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=UDPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['UDPNmapContainer%s' % UDPNmapCounter] = client.containers.run("delorean", UDPNmapCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=UDPNewNmapName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nNmap command \"{}\" has been executed in container ".format(colored("nmap -sU -Pn -iL /root/Documents/data/hosts.txt", "yellow"))+"{}".format(colored(UDPNewNmapName, "yellow"))+". When complete output can be found within {}.".format(colored("output/nmap/"+UDPNmapFileName+".txt", "yellow")))
 					
 					if re.search('parzival', MasterInput[1], re.IGNORECASE):
@@ -759,7 +782,7 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 							ParzivalCounter = ParzivalCounter+1
 							NewParzivalName = 'Parzival%s' % ParzivalCounter
 							ParzivalCommand = '/bin/bash -c \"cd /root/Documents/output/nmap && python /root/shared/tools/parzival.py -f '+ParzivalInputFilename+'\"'
-							globals()['ParzivalContainer%s' % ParzivalCounter] = client.containers.run("delorean", ParzivalCommand, detach=True, cap_add=["NET_ADMIN"], remove=True, network_mode="container:Emmett", privileged=False, name=NewParzivalName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['ParzivalContainer%s' % ParzivalCounter] = client.containers.run("delorean", ParzivalCommand, detach=True, cap_add=["NET_ADMIN"], remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], network_mode="container:Emmett", privileged=False, name=NewParzivalName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nParzival command \"{}".format(colored("python /root/shared/tools/parzival.py -f "+ParzivalInputFilename, "yellow"))+"\" has been executed in container {}.".format(colored(NewParzivalName, "yellow")))
 
 						if len(MasterInput) == 4:
@@ -768,7 +791,7 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 							ParzivalCounter = ParzivalCounter+1
 							NewParzivalName = 'Parzival%s' % ParzivalCounter
 							ParzivalCommand = '/bin/bash -c \"cd /root/Documents/output/nmap && python /root/shared/tools/parzival.py -f '+ParzivalInputFilename+ParzivalOutputFilename+'\"'
-							globals()['ParzivalContainer%s' % ParzivalCounter] = client.containers.run("delorean", ParzivalCommand, detach=True, cap_add=["NET_ADMIN"], remove=True, network_mode="container:Emmett", privileged=False, name=NewParzivalName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['ParzivalContainer%s' % ParzivalCounter] = client.containers.run("delorean", ParzivalCommand, detach=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], remove=True, network_mode="container:Emmett", privileged=False, name=NewParzivalName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nParzival command \"{}".format(colored("python /root/shared/tools/parzival.py -f "+ParzivalInputFilename+ParzivalOutputFilename, "yellow"))+"\" has been executed in container {}".format(colored(NewParzivalName, "yellow"))+". When complete output can be found within {}.".format(colored("output/nmap/"+ParzivalOutputFilename, "yellow")))
 
 					if re.search('testssl', MasterInput[1], re.IGNORECASE):
@@ -777,12 +800,12 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 						SSLHTMLFileName = "tls_output_"+now.strftime("%d%m%y_%H%M")+".txt"
 						if TLSHostFileCheck.is_file():
 							SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls/raw_outputs && script -q -c 'testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt' /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+ClientName+"\""
-							globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nTestSSL command \"{}\" has been executed in container ".format(colored("testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt", "yellow"))+"{}".format(colored(NewSSLName, "yellow"))+". When complete outputs can be found within {}.".format(colored("output/tls/", "yellow")))						
 						else:
 							print("\n{}: No TLS hosts file found, performing best effort scan using host file. For more accurate results run nmap to completion to generate a tls host file.".format(colored("WARNING", "red", attrs=["bold"])))
 							SSLCommand = "/bin/bash -c \"cd /root/Documents/output/tls/raw_outputs && testssl --warnings=batch --log --json --file ../../../data/hosts.txt |& tee -a /tmp/"+SSLHTMLFileName+" && cat /tmp"+SSLHTMLFileName+" | ansi2html > /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+ClientName+"\""
-							globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+							globals()['SSLContainer%s' % SSLCounter] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=NewSSLName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 							print("\nTestSSL command \"{}\" has been executed in container ".format(colored("testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt", "yellow"))+"{}".format(colored(NewSSLName, "yellow"))+". When complete outputs can be found within {}.".format(colored("output/tls/", "yellow")))						
 
 					if re.search('wpscan', MasterInput[1], re.IGNORECASE):
@@ -812,14 +835,14 @@ All outputs saved to current client folder under ./output/nmap/ directory.
 										WpscanHostNum = len(i)
 										WpscanHostNum = str(WpscanHostNum)
 										WpscanCommand = "/bin/bash -c \"mv /root/Documents/data/"+WpscanNewName+"_hosts.txt /tmp/ && python /root/shared/tools/wpscanloop.py -f /tmp/"+WpscanNewName+"_hosts.txt -o /root/Documents/output/http/"+WpscanFileName+"\""
-										globals()['WpscanContainer%s' % WpscanCounter] = client.containers.run("delorean", WpscanCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=WpscanNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+										globals()['WpscanContainer%s' % WpscanCounter] = client.containers.run("delorean", WpscanCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=WpscanNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 										print("\nWPScan has been executed in container for "+WpscanHostNum+" hosts from the http scope file. When complete output can be found within {}.".format(colored("output/http/"+WpscanFileName, "yellow")))
 								else:
 									WpscanCounter = WpscanCounter+1
 									WpscanNewName = 'Wpscan%s' % WpscanCounter
 									WpscanFileName = WpscanNewName+"_output_"+now.strftime("%d%m%y_%H%M")+".txt"
 									WpscanCommand = "/bin/bash -c \"python /root/shared/tools/wpscanloop.py -f /root/Documents/data/http_hosts.txt -o /root/Documents/output/http/"+WpscanFileName+"\""
-									globals()['WpscanContainer%s' % WpscanCounter] = client.containers.run("delorean", WpscanCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=WpscanNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
+									globals()['WpscanContainer%s' % WpscanCounter] = client.containers.run("delorean", WpscanCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name=WpscanNewName, labels=["Emmett"], volumes=[DocumentsVolume, DeLoreansBuildVolume])
 									print("\nWPScan has been executed in container for all hosts in http scope file. When complete output can be found within {}.".format(colored("output/http/"+WpscanFileName, "yellow")))
 	
 
@@ -1121,13 +1144,16 @@ def new_engagement_creation(ClientName):
 		with open('./config.ini', 'w') as configfile:
 			config_object.write(configfile)
 		return True
-def vpn_only_mode():
+def vpn_only_mode(EmmettVPNMFACheck=False, VPNPassword=None, VPNmfa=None):
 	try:
 		AbsoluteBuildName = Path.cwd() / "build/"
 		AbsoluteBuildName = str(AbsoluteBuildName)
 		AbsoluteEmmettBuildName = AbsoluteBuildName + "/Emmett/shared"
 		EmmettBuildVolume = AbsoluteEmmettBuildName+":/root/shared/"
-		EmmettContainer = client.containers.run("emmett", detach=True, remove=True, devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume])
+		if EmmettVPNMFACheck == True:
+			EmmettContainer = client.containers.run("emmett", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume], environment={"VPN_PASSWORD": VPNPassword, "VPN_MFA": VPNmfa})
+		else:
+			EmmettContainer = client.containers.run("emmett", detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], devices=["/dev/net/tun"], cap_add=["NET_ADMIN"], privileged=False, name="Emmett", labels=["Emmett"], ports={'8118':'8118'}, volumes=[EmmettBuildVolume])
 	except docker.errors.APIError:
 		return False
 

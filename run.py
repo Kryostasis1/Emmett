@@ -13,6 +13,7 @@ from prompt_toolkit.widgets import Frame
 from lib import assets
 from termcolor import colored
 import docker
+import getpass
 import emmett
 import subprocess
 import os
@@ -30,6 +31,9 @@ DeloreanBuildPath = str(DeloreanBuildPath)
 config_object.set('GLOBAL', 'deloreanpath', DeloreanBuildPath)
 with open('./config.ini', 'w') as configfile:
     config_object.write(configfile)
+settings_vpn_status = config_object.get("VPN", "status")
+settings_mfa_status = config_object.get("VPN", "mfa")
+settings_vpn_filename = config_object.get("VPN", "filename")
 global ClientName
 global DirectoryName
 ClientName = "None"
@@ -38,10 +42,12 @@ exit_option = 0
 output = 0
 setup_option = 0
 update_output = 0
+settings_option = 0
 menuselect_main = True
 menuselect_update = False
 menuselect_exit = False
 menuselect_setup = False
+menuselect_settings = False
 
 if global_config['setup'] == "False": #Check if Emmett isnt setup yet
     menuselect_main = False
@@ -121,11 +127,17 @@ def main_menu(): #Main Menu and Update Menu
         ]
     if menuselect_main == True:
         PrevEng = global_config["preveng"]
+        if settings_vpn_status == "Enabled":
+            vpn_status_colour = "fg:yellow"
+        else:
+            vpn_status_colour = "fg:red"
         menu_area = [#Main menu UI
                 ("class:left", "Current Menu: "),
                 ("fg:yellow", "Main Menu\n"),
                 ("class:left", "Previous Engagement: "),
-                ("fg:yellow", PrevEng+"\n\n"),
+                ("fg:yellow", PrevEng+"\n"),
+                ("class:left", "VPN Status: "),
+                (vpn_status_colour, settings_vpn_status+"\n\n"),
                 ("class:left"," Select from the menu:\n\n"),
                 ("class:left", "    1) Continue Previous Engagement\n"),
                 ("class:left", "    2) Search for Existing Engagement\n"),
@@ -133,7 +145,8 @@ def main_menu(): #Main Menu and Update Menu
                 ("class:left", "    4) VPN Only Mode\n"),
                 ("class:left", "    5) Open Sessions Window\n"),
                 ("class:left", "    6) Update Emmett\n"),
-                ("class:left", "    7) Exit\n")
+                ("class:left", "    7) Settings\n"),
+                ("class:left", "    8) Exit\n")
             ]
 
     if menuselect_update == True: #Update menu
@@ -147,6 +160,23 @@ def main_menu(): #Main Menu and Update Menu
                 ("class:left", "    3) Update Both\n"),
                 ("class:left", "    4) Back to Main Menu\n")
             ]
+
+    if menuselect_settings == True: #Settings Menu
+        settings_vpn_filename = config_object.get("VPN", "filename")
+        menu_area = [ #Update Menu Selection UI for Exit
+                ("class:left", "Current Menu: "),
+                ("fg:yellow", "Settings\n\n"),
+                ("class:left", "Current VPN Filename: "),
+                ("fg:yellow", settings_vpn_filename+"\n\n"),
+                ("class:left"," Select to alter:\n\n"),
+                ("class:left", "    1) VPN Mode: "),
+                ("fg:yellow", settings_vpn_status+" \n"),
+                ("class:left", "    2) MFA Required: "),
+                ("fg:yellow", settings_mfa_status+"\n"),
+                ("class:left", "    3) Change VPN Filename\n"),
+                ("class:left", "    4) Back to Main Menu\n"),
+        ]  
+
     if menuselect_exit == True: #Exit Menu
         menu_area = [ #Update Menu Selection UI for Exit
                 ("class:left", "Would You Like to Exit All Running Emmett Container Sessions?\n"),
@@ -237,7 +267,7 @@ def sessions_menu(): #Sessions Menu
                         now = datetime.now()
                         SSLHTMLFileName = "tls_output_"+now.strftime("%d%m%y_%H%M")+".txt"
                         SSLCommand = "/bin/bash -c \"sed -i 's/engagementtestssl = Awaiting TCP Scan Results./engagementtestssl = Running/' /root/Documents/data/emmett_config.ini && cd /root/Documents/output/tls/raw_outputs && script -q -c 'testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt' /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+Eng_Config['client']+" && sed -i 's/engagementtestssl = Running/engagementtestssl = Complete/' /root/Documents/data/emmett_config.ini\""
-                        globals()['EngagementTestssl'] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name="Engagementtestssl", labels=["Emmett","Engagement"], volumes=[DeloreanBuildVolume, DocumentsVolume])
+                        globals()['EngagementTestssl'] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name="Engagementtestssl", labels=["Emmett","Engagement"], volumes=[DeloreanBuildVolume, DocumentsVolume])
                 else:
                     curreng_object.set("ENGINFO", "engagementnmaptcp", "Scan exited with errors, output file empty.")
                     with open(AutoEngConfigLocation, 'w') as conf:
@@ -358,6 +388,9 @@ def is_exitmenu():
 @Condition
 def is_setupmenu():
     return menuselect_setup
+@Condition
+def is_settingsmenu():
+    return menuselect_settings
 
 kb = KeyBindings() #Adding Key Bindings to exit main app
 @kb.add("1", filter=is_mainmenu) #Key bindings for main menu
@@ -392,6 +425,12 @@ def _(event):
     menuselect_main = False
     menuselect_update = True
 @kb.add("7", filter=is_mainmenu)
+def _(event):
+    global menuselect_settings
+    global menuselect_main
+    menuselect_main = False
+    menuselect_settings = True
+@kb.add("8", filter=is_mainmenu)
 def _(event):
     global menuselect_main
     global menuselect_exit
@@ -459,6 +498,56 @@ def _(event):
     setup_option = 2
     exit_option = 1
     event.app.exit()
+
+@kb.add("1", filter=is_settingsmenu) #New key bindings for the Settings menu selection.
+def _(event):
+    global settings_option
+    global config_object
+    global settings_vpn_status
+    if settings_vpn_status == "Enabled":
+        config_object.set('VPN', 'status', 'Disabled')
+        settings_option = 11
+    else:
+        config_object.set('VPN', 'status', 'Enabled')
+        settings_option = 12
+    with open('./config.ini', 'w') as configfile:
+        config_object.write(configfile)
+    settings_vpn_status = config_object.get('VPN', 'status')
+    event.app.exit()
+
+@kb.add("2", filter=is_settingsmenu)
+def _(event):
+    global settings_option
+    global config_object
+    global settings_mfa_status
+    if settings_mfa_status == "True":
+        config_object.set('VPN', 'mfa', 'False')
+        settings_option = 21
+    else:
+        config_object.set('VPN', 'mfa', 'True')
+        settings_option = 22
+    with open('./config.ini', 'w') as configfile:
+        config_object.write(configfile)
+    settings_mfa_status = config_object.get('VPN', 'mfa')
+    event.app.exit()
+
+@kb.add("3", filter=is_settingsmenu)
+def _(event):
+    global config_object
+    global settings_option
+    global settings_mfa_status
+    if settings_mfa_status == "True":
+        settings_option = 22
+    else:
+        settings_option = 21
+    event.app.exit()
+
+@kb.add("4", filter=is_settingsmenu)
+def _(event):
+    global menuselect_settings
+    global menuselect_main
+    menuselect_main = True
+    menuselect_settings = False 
 
 sessionskb = KeyBindings() #Adding Key Bindings to exit Sessions screen app
 @sessionskb.add("c-q") #Key bindings for Sessions screen app
@@ -552,6 +641,7 @@ def run():
     global menuselect_main
     global output
     global update_output
+    global settings_option
     # Run the interface.
     if output == 0:
         application.run()
@@ -611,10 +701,19 @@ def run():
             else:
                 run()
         if output == 4: #VPN only mode selection
-            try:
-                emmett.vpn_only_mode()
-            except:
-                pass
+            EmmettVPNMFACheck = config_object.get("VPN", "mfa")
+            if EmmettVPNMFACheck == "True":
+                VPNPassword = getpass.getpass("VPN Password: ")
+                VPNmfa = input("MFA Code: ")
+                try:
+                    emmett.vpn_only_mode(True, VPNPassword, VPNmfa)
+                except:
+                    pass
+            else:
+                try:
+                    emmett.vpn_only_mode()
+                except:
+                    pass
             sessions_run()
             run()
         if output == 5: #Open Sessions window selection
@@ -673,6 +772,34 @@ def run():
             update_output = 0
             run()
 
+        if menuselect_settings == True: #VPN Settings Menu Processes
+            EmmettStatus = assets.emmett_status()
+            settings_mfa_status = config_object.get('VPN', 'mfa')
+            settings_vpn_status = config_object.get('VPN', 'status')
+            if settings_vpn_status == 'Enabled':
+                settings_vpn_status = 'y'
+            else:
+                settings_vpn_status = 'n'
+            settings_mfa = 'Ignore'
+            if settings_option == 11:
+                assets.startupscript_generate(settings_mfa, 'n')
+                if EmmettStatus == True:
+                    assets.emmett_startup(settings_mfa_status, 'n')
+            if settings_option == 12:
+                assets.startupscript_generate(settings_mfa, 'y')
+                if EmmettStatus == True:
+                    assets.emmett_startup(settings_mfa_status, 'y')
+            if settings_option == 21:
+                assets.startupscript_generate('n', 'y')
+                if EmmettStatus == True:
+                    assets.emmett_startup(settings_mfa_status, settings_vpn_status)
+            if settings_option == 22:
+                assets.startupscript_generate('y', 'y')
+                if EmmettStatus == True:
+                    assets.emmett_startup(settings_mfa_status, settings_vpn_status)
+            settings_option = 0
+            run()
+
         if menuselect_exit == True:
             if exit_option == 1: #Exit process
                 if global_config["setup"] == "True":
@@ -696,12 +823,14 @@ def run():
         kalipull = assets.kali_pull()
         assets.image_create()
         assets.burpsuite_update()
-        assets.startupscript_generate()
+        config_object.read("./config.ini")
         config_object.set('GLOBAL', 'setup', 'True')
         config_object.set('GLOBAL', 'preveng', 'None')
         with open('./config.ini', 'w') as configfile:
             config_object.write(configfile)
+        assets.startupscript_generate()
         print("{}".format(colored("Setup Complete, Entering Emmett.", "green")))
+        config_object.read("./config.ini")
         time.sleep(5)
         ouput = 0
         run()
