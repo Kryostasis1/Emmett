@@ -8,6 +8,7 @@ enginfo = config_object['ENGINFO']
 
 linedict = []
 linenum = 0
+hostHeadersDictNum = 0
 
 #Header
 print("""
@@ -16,7 +17,7 @@ __________                     .__              .__
  |     ___/\\__  \\\\_  __ \\___   /  \\  \\/ /\\__  \\ |  |  
  |    |     / __ \\|  | \\//    /|  |\\   /  / __ \\|  |__
  |____|    (____  /__|  /_____ \\__| \\_/  (____  /____/
-                \\/            \\/              \\/ Emmett edition - v0.0.3          
+                \\/            \\/              \\/ Emmett edition - v0.0.4          
                                                                                    
 """)
 usage_text = 'python parzival.py'
