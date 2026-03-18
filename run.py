@@ -266,8 +266,8 @@ def sessions_menu(): #Sessions Menu
                     else:
                         now = datetime.now()
                         SSLHTMLFileName = "tls_output_"+now.strftime("%d%m%y_%H%M")+".txt"
-                        SSLCommand = "/bin/bash -c \"sed -i 's/engagementtestssl = Awaiting TCP Scan Results./engagementtestssl = Running/' /root/Documents/data/emmett_config.ini && cd /root/Documents/output/tls/raw_outputs && script -q -c 'testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt' /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+Eng_Config['client']+" && sed -i 's/engagementtestssl = Running/engagementtestssl = Complete/' /root/Documents/data/emmett_config.ini\""
-                        globals()['EngagementTestssl'] = client.containers.run("delorean", SSLCommand, detach=True, remove=True, entrypoint=["/bin/bash","/root/shared/startup.sh"], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name="Engagementtestssl", labels=["Emmett","Engagement"], volumes=[DeloreanBuildVolume, DocumentsVolume])
+                        SSLCommand = "sed -i 's/engagementtestssl = Awaiting TCP Scan Results./engagementtestssl = Running/' /root/Documents/data/emmett_config.ini && cd /root/Documents/output/tls/raw_outputs && script -q -c 'testssl --warnings=batch --log --json --file ../../../data/tls_hosts.txt' /root/Documents/output/tls/"+SSLHTMLFileName+" && /root/shared/EzModeSSL -d . -o ../"+Eng_Config['client']+" && sed -i 's/engagementtestssl = Running/engagementtestssl = Complete/' /root/Documents/data/emmett_config.ini"
+                        globals()['EngagementTestssl'] = client.containers.run("delorean", detach=True, remove=True, entrypoint=["/bin/bash","-c",SSLCommand], cap_add=["NET_ADMIN"], network_mode="container:Emmett", privileged=False, name="Engagementtestssl", labels=["Emmett","Engagement"], volumes=[DeloreanBuildVolume, DocumentsVolume])
                 else:
                     curreng_object.set("ENGINFO", "engagementnmaptcp", "Scan exited with errors, output file empty.")
                     with open(AutoEngConfigLocation, 'w') as conf:
