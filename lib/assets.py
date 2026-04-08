@@ -23,7 +23,7 @@ ___________                       __    __
 /_______  /__|_|  /__|_|  /\\___  >__|  |__| 
         \\/      \\/      \\/     \\/            """)
 
-slogan = ("""v2.1.15
+slogan = ("""v2.1.16
 The Way I See It, If You're Gonna Build An Engagement, Why Not Do It With Some Style?
 
 
@@ -36,7 +36,7 @@ ___________                       __    __
  |    __)_ /     \\ /     \\_/ __ \\   __\\   __\\
  |        \\  Y Y  \\  Y Y  \\  ___/|  |  |  |  
 /_______  /__|_|  /__|_|  /\\___  >__|  |__| 
-              \\/      \\/      \\/     \\/            v2.1.15
+              \\/      \\/      \\/     \\/            v2.1.16
     """)
 
 app_slogan = ("""The Way I See It, If You're Gonna Build An Engagement, Why Not Do It With Some Style?
@@ -167,7 +167,7 @@ def ui_burpsuite_update():
         # get latest burp version from page text
         version_heading = burpcontent.find('h1').get_text()
         version_split = version_heading.split()
-        latest_version = version_split[4]
+        latest_version = version_split[3]
         print(latest_version)
         print("Downloading latest Burpsuite JAR file.")
         burpurl = DOWNLOAD_URL.format(latest_version)
