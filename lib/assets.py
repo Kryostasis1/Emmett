@@ -23,7 +23,7 @@ ___________                       __    __
 /_______  /__|_|  /__|_|  /\\___  >__|  |__| 
         \\/      \\/      \\/     \\/            """)
 
-slogan = ("""v2.1.16
+slogan = ("""v2.1.17
 The Way I See It, If You're Gonna Build An Engagement, Why Not Do It With Some Style?
 
 
@@ -36,7 +36,7 @@ ___________                       __    __
  |    __)_ /     \\ /     \\_/ __ \\   __\\   __\\
  |        \\  Y Y  \\  Y Y  \\  ___/|  |  |  |  
 /_______  /__|_|  /__|_|  /\\___  >__|  |__| 
-              \\/      \\/      \\/     \\/            v2.1.16
+              \\/      \\/      \\/     \\/            v2.1.17
     """)
 
 app_slogan = ("""The Way I See It, If You're Gonna Build An Engagement, Why Not Do It With Some Style?
@@ -91,7 +91,7 @@ def image_update():
         if len(dockercheck2) > 0:
             print("Previous DeLorean image located.")
             print("Updating DeLorean image.")
-            DeloreanUpdate = client.images.build(path="lib/update/DeLoreans/", tag="delorean", rm=True)
+            DeloreanUpdate = client.images.build(path="lib/update/DeLoreans/", tag="delorean", rm=True, nocache=True, pull=True)
             for item in DeloreanUpdate[1]:
                 for key, value in item.items():
                     if key == 'stream':
@@ -143,34 +143,28 @@ def ui_image_update():
 
 def burpsuite_update():
     #Updating or initially downloading Burpsuite file
-    LATEST_VER_URL = "https://portswigger.net/burp/releases/professional/latest"
-    DOWNLOAD_URL = "https://portswigger.net/burp/releases/download?product=pro&version={}&type=jar"
+    LATEST_VER_URL = "https://portswigger.net/burp/downloads"
+    DOWNLOAD_URL = "https://portswigger.net/burp/releases/download?product=desktop&version={}&type=Jar"
     burphtml = requests.get(LATEST_VER_URL)
     burpcontent = BeautifulSoup(burphtml.text, features="lxml")
     # get latest burp version from page text
-    version_heading = burpcontent.find('h1').get_text()
-    version_split = version_heading.split()
-    latest_version = version_split[4]
-    print(latest_version)
+    version_heading = burpcontent.find('em').get_text()
     print("Downloading latest Burpsuite JAR file.")
-    burpurl = DOWNLOAD_URL.format(latest_version)
+    burpurl = DOWNLOAD_URL.format(version_heading)
     burpfilename = "lib/burpsuite.jar"
     urlretrieve(burpurl, burpfilename)
 
 def ui_burpsuite_update():
     #Updating or initially downloading Burpsuite file
     try:
-        LATEST_VER_URL = "https://portswigger.net/burp/releases/professional/latest"
-        DOWNLOAD_URL = "https://portswigger.net/burp/releases/download?product=pro&version={}&type=jar"
+        LATEST_VER_URL = "https://portswigger.net/burp/downloads"
+        DOWNLOAD_URL = "https://portswigger.net/burp/releases/download?product=desktop&version={}&type=Jar"
         burphtml = requests.get(LATEST_VER_URL)
         burpcontent = BeautifulSoup(burphtml.text, features="lxml")
         # get latest burp version from page text
-        version_heading = burpcontent.find('h1').get_text()
-        version_split = version_heading.split()
-        latest_version = version_split[3]
-        print(latest_version)
+        version_heading = burpcontent.find('em').get_text()
         print("Downloading latest Burpsuite JAR file.")
-        burpurl = DOWNLOAD_URL.format(latest_version)
+        burpurl = DOWNLOAD_URL.format(version_heading)
         burpfilename = "lib/burpsuite.jar"
         urlretrieve(burpurl, burpfilename)
         return True
