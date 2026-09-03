@@ -19,6 +19,8 @@ import subprocess
 import os
 import time
 import re
+import ipaddress
+import requests
 from datetime import datetime, timedelta
 from pathlib import Path
 client = docker.from_env()
@@ -52,6 +54,14 @@ menuselect_settings = False
 if global_config['setup'] == "False": #Check if Emmett isnt setup yet
     menuselect_main = False
     menuselect_setup = True
+
+# Emmett IP check cache
+EMMETT_HOST_IP_CACHE = None
+EMMETT_CONTAINER_IP_CACHE = None
+EMMETT_IP_CACHE_INTERVAL = 60
+EMMETT_IP_CACHE_TIME = time.time() - EMMETT_IP_CACHE_INTERVAL
+EMMETT_IP_START_TIME = time.time()
+EMMETT_IP_FIRST_CHECK_DELAY = 5
 
 def engagement_scope(): #Engagement Scope
     if global_config['curreng'] != "None":
@@ -113,6 +123,153 @@ def get_sessionbar(): #Top title logo area for container sessions screen
     if global_config['curreng'] != "None":
         titlebar.append(("class:title", " ([Ctrl-S] to hide/show AutoEngagement progress.)"))
     return titlebar
+
+def get_public_ip():
+    """
+    Get host public IP securely using HTTPS.
+    """
+
+    services = [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://icanhazip.com"
+    ]
+
+    for service in services:
+        try:
+            response = requests.get(
+                service,
+                timeout=5,
+                headers={
+                    "User-Agent": "Emmett-IP-Checker"
+                }
+            )
+
+            response.raise_for_status()
+
+            ip = response.text.strip()
+
+            # Validate returned value
+            ipaddress.ip_address(ip)
+
+            return ip
+
+        except Exception:
+            continue
+
+    return None
+
+
+def get_emmett_public_ip(container_name="Emmett"):
+    """
+    Get Emmett container public IP using curl via Docker SDK exec.
+    """
+
+    services = [
+        "https://api.ipify.org",
+        "https://ifconfig.me/ip",
+        "https://icanhazip.com"
+    ]
+
+    try:
+        container = client.containers.get(container_name)
+
+    except Exception:
+        return None
+
+
+    for service in services:
+        try:
+            result = container.exec_run(
+                [
+                    "curl",
+                    "-fsSL",
+                    "--max-time",
+                    "5",
+                    service
+                ]
+            )
+
+            if result.exit_code != 0:
+                continue
+
+            ip = result.output.decode().strip()
+
+            # Validate returned value
+            ipaddress.ip_address(ip)
+
+            return ip
+
+        except Exception:
+            continue
+
+    return None
+
+
+def get_emmett_ip_status():
+    """
+    Returns cached Emmett IP status formatted for Prompt Toolkit.
+    Refreshes every 60 seconds.
+    First check waits 5 seconds to allow container startup.
+    """
+
+    global EMMETT_IP_CACHE_TIME
+    global EMMETT_HOST_IP_CACHE
+    global EMMETT_CONTAINER_IP_CACHE
+    global EMMETT_IP_FIRST_CHECK
+
+    current_time = time.time()
+
+    # Do not block startup - wait 5 seconds before first lookup
+    if current_time - EMMETT_IP_START_TIME >= EMMETT_IP_FIRST_CHECK_DELAY:
+
+        if (
+            current_time - EMMETT_IP_CACHE_TIME >= EMMETT_IP_CACHE_INTERVAL
+            or EMMETT_HOST_IP_CACHE is None
+            or EMMETT_CONTAINER_IP_CACHE is None
+        ):
+
+            EMMETT_HOST_IP_CACHE = get_public_ip()
+            EMMETT_CONTAINER_IP_CACHE = get_emmett_public_ip()
+
+            EMMETT_IP_CACHE_TIME = current_time
+
+    output = [
+        ("class:left", "Emmett VPN Status: ")
+    ]
+
+    if time.time() - EMMETT_IP_START_TIME < EMMETT_IP_FIRST_CHECK_DELAY:
+        output.append(
+            ("fg:yellow", "Waiting for Emmett startup...\n")
+        )
+
+    elif EMMETT_HOST_IP_CACHE is None:
+        output.append(
+            ("fg:red", "Unable to determine host IP\n")
+        )
+
+    elif EMMETT_CONTAINER_IP_CACHE is None:
+        output.append(
+            ("fg:red", "Unable to determine Emmett IP\n")
+        )
+
+    elif EMMETT_HOST_IP_CACHE == EMMETT_CONTAINER_IP_CACHE:
+        output.append(
+            (
+                "fg:red",
+                f"{EMMETT_CONTAINER_IP_CACHE} (DISCONNECTED)\n"
+            )
+        )
+
+    else:
+        output.append(
+            (
+                "fg:green",
+                f"{EMMETT_CONTAINER_IP_CACHE} (CONNECTED)\n"
+            )
+        )
+
+    return output
 
 def main_menu(): #Main Menu and Update Menu
     config_object.read("./config.ini")
@@ -281,13 +438,16 @@ def sessions_menu(): #Sessions Menu
                         with open(AutoEngConfigLocation, 'w') as conf:
                             curreng_object.write(conf)
 
-
-
         ActiveContainerList = [
             ("class:body", "Current Engagement: "),
-            ("fg:yellow", global_config['curreng']+"\n\n"),
-            ("underline", "Active Containers\n")
+            ("fg:yellow", global_config['curreng']+"\n"),
         ]
+
+        ActiveContainerList.extend(get_emmett_ip_status())
+
+        ActiveContainerList.append(
+            ("underline", "\nActive Containers\n")
+        )
     else:
         ActiveContainerList = [
             ("underline", "Active Containers\n")
